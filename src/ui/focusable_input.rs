@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use crossterm::event::Event;
 
@@ -26,7 +26,7 @@ pub trait InputHandler {
 /// ```
 pub struct MessageTranslator<A: InputHandler, B> {
     input_handler: A,
-    mapper: Arc<dyn Fn(A::Message) -> Option<B> + Send + Sync>,
+    mapper: Rc<dyn Fn(A::Message) -> Option<B> + Send + Sync>,
 }
 
 impl<A: InputHandler + 'static, B> MessageTranslator<A, B> {
@@ -36,7 +36,7 @@ impl<A: InputHandler + 'static, B> MessageTranslator<A, B> {
     ) -> Self {
         Self {
             input_handler,
-            mapper: Arc::new(mapper),
+            mapper: Rc::new(mapper),
         }
     }
 

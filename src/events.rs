@@ -1,9 +1,4 @@
-use std::{
-    error::Error,
-    rc::Rc,
-    sync::RwLock,
-    time::Duration,
-};
+use std::{error::Error, rc::Rc, sync::RwLock, time::Duration};
 
 use crossterm::event::{self, Event, KeyCode};
 

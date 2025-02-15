@@ -8,10 +8,10 @@ use crate::{
     },
 };
 
-use std::sync::{Arc, Mutex};
+use std::{rc::Rc, sync::Mutex};
 
-type MessageTranslatorArc<T> = Arc<Mutex<MessageTranslator<T, AppAction>>>;
-type InputHandlerArc = Arc<Mutex<dyn InputHandler<Message = AppAction>>>;
+type MessageTranslatorRc<T> = Rc<Mutex<MessageTranslator<T, AppAction>>>;
+type InputHandlerRc = Rc<Mutex<dyn InputHandler<Message = AppAction>>>;
 
 #[derive(Debug, Clone)]
 pub enum AppAction {
@@ -33,12 +33,12 @@ pub struct AppState {
     pub lines: LogBuffer,
     pub line_num: u16,
     pub attached_to_bottom: bool,
-    pub search_input: Option<MessageTranslatorArc<TextInputState>>,
+    pub search_input: Option<MessageTranslatorRc<TextInputState>>,
     pub search: Option<String>,
-    pub go_to_line: Option<MessageTranslatorArc<TextInputState>>,
+    pub go_to_line: Option<MessageTranslatorRc<TextInputState>>,
     pub show_line_numbers: bool,
 
-    pub focused_input: Option<InputHandlerArc>,
+    pub focused_input: Option<InputHandlerRc>,
     pub last_frame_height: u16,
     pub quit: bool,
 }
@@ -145,7 +145,7 @@ impl AppState {
             }
         });
 
-        let search_input = Arc::new(Mutex::new(search_input));
+        let search_input = Rc::new(Mutex::new(search_input));
         self.search_input = Some(search_input.clone());
         self.focused_input = Some(search_input);
     }
@@ -161,7 +161,7 @@ impl AppState {
             TextInputMsg::Accept(input) => Some(AppAction::AcceptGoToLine(input)),
         });
 
-        let go_to_line = Arc::new(Mutex::new(go_to_line));
+        let go_to_line = Rc::new(Mutex::new(go_to_line));
         self.go_to_line = Some(go_to_line.clone());
         self.focused_input = Some(go_to_line);
     }
