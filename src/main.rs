@@ -51,8 +51,11 @@ fn run(mut terminal: DefaultTerminal, cli: Cli) -> Result<(), Box<dyn Error>> {
             break Ok(());
         }
 
-        while let Ok(line) = rx.try_recv() {
-            state.write().unwrap().add_line(line);
+        {
+            let mut state = state.write().unwrap();
+            while let Ok(line) = rx.try_recv() {
+                state.add_line(line);
+            }
         }
 
         terminal.draw(|f| {
