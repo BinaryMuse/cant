@@ -35,7 +35,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn run(mut terminal: DefaultTerminal, cli: Cli) -> Result<(), Box<dyn Error>> {
     let input = cli
         .input
-        .map(|s| InputSource::File(PathBuf::from(s)))
+        .map(|s| match s.as_str() {
+            "-" => InputSource::Stdin,
+            s => InputSource::File(PathBuf::from(s)),
+        })
         .unwrap_or(InputSource::Stdin);
 
     let state = Arc::new(RwLock::new(AppState::new()));
