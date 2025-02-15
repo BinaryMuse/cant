@@ -5,6 +5,15 @@ use crossterm::event::{self, Event, KeyCode};
 use crate::{state::AppAction, AppState};
 
 pub fn poll_events(state: Rc<RwLock<AppState>>) -> Result<Option<AppAction>, Box<dyn Error>> {
+    let state = state.read().unwrap();
+    if let Some(focused) = state.focused_input.as_ref() {
+        focused.lock().unwrap().handle_input()
+    } else {
+        handle_general_events(&state)
+    }
+}
+
+fn handle_general_events(state: &AppState) -> Result<Option<AppAction>, Box<dyn Error>> {
     let has_event = event::poll(Duration::from_millis(50))?;
     if !has_event {
         return Ok(None);
@@ -12,18 +21,8 @@ pub fn poll_events(state: Rc<RwLock<AppState>>) -> Result<Option<AppAction>, Box
 
     let next = event::read()?;
 
-    let state = state.read().unwrap();
-    if let Some(focused) = state.focused_input.as_ref() {
-        let action = focused.lock().unwrap().handle_input(next);
-        Ok(action)
-    } else {
-        Ok(handle_general_events(&state, &next))
-    }
-}
-
-fn handle_general_events(state: &AppState, next: &Event) -> Option<AppAction> {
     if let Event::Key(key) = next {
-        match key.code {
+        let action = match key.code {
             KeyCode::Down => Some(AppAction::ScrollDown(1)),
             KeyCode::Up => Some(AppAction::ScrollUp(1)),
             KeyCode::Esc => Some(AppAction::Quit),
@@ -38,8 +37,10 @@ fn handle_general_events(state: &AppState, next: &Event) -> Option<AppAction> {
             KeyCode::Char('g') => Some(AppAction::OpenGoToLine),
             KeyCode::Char('/') => Some(AppAction::OpenSearch),
             _ => None,
-        }
+        };
+
+        Ok(action)
     } else {
-        None
+        Ok(None)
     }
 }

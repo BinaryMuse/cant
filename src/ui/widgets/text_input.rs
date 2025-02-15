@@ -1,3 +1,5 @@
+use std::{error::Error, time::Duration};
+
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     buffer::Buffer,
@@ -5,6 +7,7 @@ use ratatui::{
     text::Text,
     widgets::{Block, Borders, Clear, Paragraph, StatefulWidget, Widget, Wrap},
 };
+use rustyline::error::ReadlineError;
 
 use crate::ui::focusable_input::InputHandler;
 
@@ -108,12 +111,14 @@ impl TextInputState {
 impl InputHandler for TextInputState {
     type Message = TextInputMsg;
 
-    fn handle_input(&mut self, event: Event) -> Option<TextInputMsg> {
-        if let Event::Key(key) = event {
+    fn handle_input(&mut self) -> Result<Option<TextInputMsg>, Box<dyn Error>> {
+        let event = self.get_next_event()?;
+
+        if let Some(Event::Key(key)) = event {
             let modifiers = key.modifiers;
             let ctrl = modifiers.contains(event::KeyModifiers::CONTROL);
 
-            match key.code {
+            let msg = match key.code {
                 KeyCode::Esc => Some(TextInputMsg::Close),
                 KeyCode::Backspace => {
                     self.backspace();
@@ -146,9 +151,11 @@ impl InputHandler for TextInputState {
                     None
                 }
                 _ => None,
-            }
+            };
+
+            Ok(msg)
         } else {
-            None
+            Ok(None)
         }
     }
 }

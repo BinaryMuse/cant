@@ -1,12 +1,26 @@
-use std::rc::Rc;
+use std::{error::Error, rc::Rc, time::Duration};
 
-use crossterm::event::Event;
+use crossterm::event;
 
 /// A trait for widgets that can handle input events and generate messages.
+/// If the widget needs to do manual handling of CrossTerm events, [`get_next_event`] is
+/// provided to get the next event from the event queue.
 pub trait InputHandler {
     type Message;
 
-    fn handle_input(&mut self, event: Event) -> Option<Self::Message>;
+    /// Handle input. May return `None` if the input was handled internally.
+    fn handle_input(&mut self) -> Result<Option<Self::Message>, Box<dyn Error>>;
+
+    /// Get the next event from the event queue.
+    fn get_next_event(&mut self) -> Result<Option<event::Event>, Box<dyn Error>> {
+        let has_event = event::poll(Duration::from_millis(50))?;
+        if !has_event {
+            return Ok(None);
+        }
+
+        let event = event::read()?;
+        Ok(Some(event))
+    }
 }
 
 /// An [`InputHandler`] that wraps another `InputHandler` and translates messages it generates
@@ -48,8 +62,8 @@ impl<A: InputHandler + 'static, B> MessageTranslator<A, B> {
 impl<A: InputHandler, B> InputHandler for MessageTranslator<A, B> {
     type Message = B;
 
-    fn handle_input(&mut self, event: Event) -> Option<Self::Message> {
-        let msg = self.input_handler.handle_input(event);
-        msg.and_then(|msg| (self.mapper)(msg))
+    fn handle_input(&mut self) -> Result<Option<Self::Message>, Box<dyn Error>> {
+        let msg = self.input_handler.handle_input()?;
+        Ok(msg.and_then(|msg| (self.mapper)(msg)))
     }
 }
