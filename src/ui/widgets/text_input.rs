@@ -14,21 +14,11 @@ pub enum TextInputMsg {
     Accept(String),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TextInputState {
     pub input: String,
     pub character_index: u16,
     pub cursor_position: (u16, u16),
-}
-
-impl Default for TextInputState {
-    fn default() -> Self {
-        Self {
-            input: String::new(),
-            character_index: 0,
-            cursor_position: (0, 0),
-        }
-    }
 }
 
 impl TextInputState {
@@ -163,15 +153,9 @@ impl InputHandler for TextInputState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TextInput {
     pub title: Option<String>,
-}
-
-impl Default for TextInput {
-    fn default() -> Self {
-        Self { title: None }
-    }
 }
 
 impl TextInput {

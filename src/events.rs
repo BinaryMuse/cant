@@ -1,6 +1,7 @@
 use std::{
     error::Error,
-    sync::{Arc, RwLock},
+    rc::Rc,
+    sync::RwLock,
     time::Duration,
 };
 
@@ -8,7 +9,7 @@ use crossterm::event::{self, Event, KeyCode};
 
 use crate::{state::AppAction, AppState};
 
-pub fn poll_events(state: Arc<RwLock<AppState>>) -> Result<Option<AppAction>, Box<dyn Error>> {
+pub fn poll_events(state: Rc<RwLock<AppState>>) -> Result<Option<AppAction>, Box<dyn Error>> {
     let has_event = event::poll(Duration::from_millis(50))?;
     if !has_event {
         return Ok(None);

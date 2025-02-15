@@ -2,7 +2,8 @@ use std::{
     error::Error,
     io::{BufRead, BufReader},
     path::PathBuf,
-    sync::{Arc, RwLock},
+    rc::Rc,
+    sync::RwLock,
 };
 
 use crate::state::AppState;
@@ -41,7 +42,7 @@ fn run(mut terminal: DefaultTerminal, cli: Cli) -> Result<(), Box<dyn Error>> {
         })
         .unwrap_or(InputSource::Stdin);
 
-    let state = Arc::new(RwLock::new(AppState::new()));
+    let state = Rc::new(RwLock::new(AppState::new()));
 
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || read_from_input(input, tx));
@@ -59,7 +60,7 @@ fn run(mut terminal: DefaultTerminal, cli: Cli) -> Result<(), Box<dyn Error>> {
         }
 
         terminal.draw(|f| {
-            let _ = ui::render(f, &state.clone());
+            ui::render(f, &state.clone());
         })?;
 
         if let Some(action) = events::poll_events(state.clone())? {

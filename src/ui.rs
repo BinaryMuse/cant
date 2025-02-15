@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    rc::Rc,
+    sync::RwLock,
+};
 
 use ratatui::{
     layout::Flex,
@@ -12,7 +15,7 @@ use crate::AppState;
 pub mod focusable_input;
 pub mod widgets;
 
-pub fn render(frame: &mut Frame, state: &Arc<RwLock<AppState>>) {
+pub fn render(frame: &mut Frame, state: &Rc<RwLock<AppState>>) {
     let outer_block = Block::default().title("logfile").borders(Borders::ALL);
     let size = outer_block.inner(frame.area());
     state.write().unwrap().last_frame_height = size.height;
