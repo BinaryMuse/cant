@@ -1,4 +1,6 @@
-# Cant - A Terminal Log Viewer
+# `cant` - A Terminal Log Viewer
+
+> cant (noun) - `/kænt/` - a partly trimmed log
 
 Cant is a powerful terminal-based log viewer built in Rust, designed to make log file analysis more efficient and intuitive. It provides a modern, interactive interface for viewing, searching, and filtering log files.
 
