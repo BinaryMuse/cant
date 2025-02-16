@@ -1,5 +1,7 @@
 mod line_buffer;
 
+use ratatui::style::Color;
+
 use crate::{
     state::line_buffer::LogBuffer,
     ui::{
@@ -25,7 +27,8 @@ pub enum AppAction {
     AcceptSearch(String),
     OpenGoToLine,
     CloseGoToLine,
-    AcceptGoToLine(String),
+    AcceptGoToLine(u16),
+    SetGoToLineColor(Color),
     Quit,
 }
 
@@ -77,11 +80,10 @@ impl AppState {
                 self.close_search();
             }
             AppAction::AcceptGoToLine(line_number) => {
-                if let Ok(line_number) = line_number.parse::<u16>() {
-                    self.set_line_number(line_number);
-                    self.close_go_to_line();
-                }
+                self.set_line_number(line_number);
+                self.close_go_to_line();
             }
+            AppAction::SetGoToLineColor(color) => self.set_go_to_line_color(color),
         }
     }
 
@@ -142,6 +144,7 @@ impl AppState {
             |msg| match msg {
                 TextInputMsg::Close => Some(AppAction::CloseSearch),
                 TextInputMsg::Accept(input) => Some(AppAction::AcceptSearch(input)),
+                _ => None,
             }
         });
 
@@ -158,7 +161,20 @@ impl AppState {
     pub fn open_go_to_line(&mut self) {
         let go_to_line = MessageTranslator::new(TextInputState::default(), |msg| match msg {
             TextInputMsg::Close => Some(AppAction::CloseGoToLine),
-            TextInputMsg::Accept(input) => Some(AppAction::AcceptGoToLine(input)),
+            TextInputMsg::Accept(input) => {
+                if let Ok(line_number) = input.parse::<u16>() {
+                    Some(AppAction::AcceptGoToLine(line_number))
+                } else {
+                    None
+                }
+            }
+            TextInputMsg::Change(input) => {
+                if let Ok(_) = input.parse::<u16>() {
+                    Some(AppAction::SetGoToLineColor(Color::Reset))
+                } else {
+                    Some(AppAction::SetGoToLineColor(Color::Red))
+                }
+            }
         });
 
         let go_to_line = Rc::new(Mutex::new(go_to_line));
@@ -169,5 +185,13 @@ impl AppState {
     pub fn close_go_to_line(&mut self) {
         self.go_to_line = None;
         self.focused_input = None;
+    }
+
+    pub fn set_go_to_line_color(&mut self, color: Color) {
+        if let Some(go_to_line) = self.go_to_line.as_ref() {
+            let mut go_to_line = go_to_line.lock().unwrap();
+            let go_to_line = go_to_line.input_handler_mut();
+            go_to_line.color = color;
+        }
     }
 }

@@ -1,13 +1,14 @@
-use std::{error::Error, time::Duration};
+use std::{error::Error, rc::Rc};
 
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
+    style::Color,
     text::Text,
     widgets::{Block, Borders, Clear, Paragraph, StatefulWidget, Widget, Wrap},
 };
-use rustyline::error::ReadlineError;
+use tui_input::{Input, InputRequest};
 
 use crate::ui::focusable_input::InputHandler;
 
@@ -15,95 +16,22 @@ use crate::ui::focusable_input::InputHandler;
 pub enum TextInputMsg {
     Close,
     Accept(String),
+    Change(String),
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct TextInputState {
-    pub input: String,
-    pub character_index: u16,
+    pub input: Input,
     pub cursor_position: (u16, u16),
+    pub color: Color,
 }
 
 impl TextInputState {
     pub fn from_str(s: &str) -> Self {
         Self {
-            input: s.to_string(),
-            character_index: s.len() as u16,
+            input: Input::new(s.to_string()),
+            color: Color::Reset,
             ..Default::default()
-        }
-    }
-
-    pub fn add_char(&mut self, c: char) {
-        let pos = self.character_index as usize;
-        self.input.insert(pos, c);
-        self.character_index += 1;
-    }
-
-    pub fn backspace(&mut self) {
-        if self.character_index > 0 {
-            let pos = self.character_index as usize - 1;
-            self.input.remove(pos);
-            self.character_index -= 1;
-        }
-    }
-
-    pub fn backspace_word(&mut self) {
-        if self.character_index > 0 {
-            let mut pos = self.character_index as usize - 1;
-
-            while pos > 0
-                && !self.input[pos - 1..pos]
-                    .chars()
-                    .next()
-                    .unwrap()
-                    .is_whitespace()
-                && !matches!(
-                    self.input[pos - 1..pos].chars().next().unwrap(),
-                    '-' | '_'
-                        | '+'
-                        | '='
-                        | ','
-                        | '.'
-                        | '/'
-                        | '\\'
-                        | ':'
-                        | ';'
-                        | '!'
-                        | '?'
-                        | '@'
-                        | '#'
-                        | '$'
-                        | '%'
-                        | '^'
-                        | '&'
-                        | '*'
-                        | '('
-                        | ')'
-                        | '['
-                        | ']'
-                        | '{'
-                        | '}'
-                )
-            {
-                pos -= 1;
-            }
-
-            while pos < self.character_index as usize {
-                self.input.remove(pos);
-                self.character_index -= 1;
-            }
-        }
-    }
-
-    pub fn move_left(&mut self) {
-        if self.character_index > 0 {
-            self.character_index -= 1;
-        }
-    }
-
-    pub fn move_right(&mut self) {
-        if self.character_index < self.input.len() as u16 {
-            self.character_index += 1;
         }
     }
 }
@@ -113,42 +41,94 @@ impl InputHandler for TextInputState {
 
     fn handle_input(&mut self) -> Result<Option<TextInputMsg>, Box<dyn Error>> {
         let event = self.get_next_event()?;
+        if event.is_none() {
+            return Ok(None);
+        }
 
-        if let Some(Event::Key(key)) = event {
+        let event = event.unwrap();
+
+        if let Event::Key(key) = event {
             let modifiers = key.modifiers;
             let ctrl = modifiers.contains(event::KeyModifiers::CONTROL);
 
             let msg = match key.code {
                 KeyCode::Esc => Some(TextInputMsg::Close),
-                KeyCode::Backspace => {
-                    self.backspace();
-                    None
-                }
-                KeyCode::Left => {
-                    self.move_left();
-                    None
-                }
-                KeyCode::Right => {
-                    self.move_right();
-                    None
-                }
-                KeyCode::Enter => Some(TextInputMsg::Accept(self.input.clone())),
+                KeyCode::Enter => Some(TextInputMsg::Accept(self.input.value().to_string())),
                 KeyCode::Char('c') if ctrl => Some(TextInputMsg::Close),
-                KeyCode::Char('w') if ctrl => {
-                    self.backspace_word();
+
+                KeyCode::Backspace => {
+                    self.input.handle(InputRequest::DeletePrevChar);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+                KeyCode::Char('h') if ctrl => {
+                    self.input.handle(InputRequest::DeletePrevChar);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+
+                KeyCode::Delete => {
+                    self.input.handle(InputRequest::DeleteNextChar);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+                KeyCode::Char('d') if ctrl => {
+                    self.input.handle(InputRequest::DeleteNextChar);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+
+                KeyCode::Left => {
+                    self.input.handle(InputRequest::GoToPrevChar);
+                    None
+                }
+                KeyCode::Char('b') if ctrl => {
+                    self.input.handle(InputRequest::GoToPrevChar);
+                    None
+                }
+
+                KeyCode::Right => {
+                    self.input.handle(InputRequest::GoToNextChar);
+                    None
+                }
+                KeyCode::Char('f') if ctrl => {
+                    self.input.handle(InputRequest::GoToNextChar);
+                    None
+                }
+
+                KeyCode::Home => {
+                    self.input.handle(InputRequest::GoToStart);
                     None
                 }
                 KeyCode::Char('a') if ctrl => {
-                    self.character_index = 0;
+                    self.input.handle(InputRequest::GoToStart);
+                    None
+                }
+
+                KeyCode::End => {
+                    self.input.handle(InputRequest::GoToEnd);
                     None
                 }
                 KeyCode::Char('e') if ctrl => {
-                    self.character_index = self.input.len() as u16;
+                    self.input.handle(InputRequest::GoToEnd);
                     None
                 }
-                KeyCode::Char(c) => {
-                    self.add_char(c);
-                    None
+
+                KeyCode::Char('u') if ctrl => {
+                    while self.input.cursor() > 0 {
+                        self.input.handle(InputRequest::DeletePrevChar);
+                    }
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+                KeyCode::Char('k') if ctrl => {
+                    self.input.handle(InputRequest::DeleteTillEnd);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+                KeyCode::Char('w') if ctrl => {
+                    // delete word leading to cursor
+                    self.input.handle(InputRequest::DeletePrevWord);
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
+                }
+
+                KeyCode::Char(char) => {
+                    self.input.handle(InputRequest::InsertChar(char));
+                    Some(TextInputMsg::Change(self.input.value().to_string()))
                 }
                 _ => None,
             };
@@ -178,9 +158,7 @@ impl StatefulWidget for TextInput {
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let mut extended_by_one = area;
         extended_by_one.x = extended_by_one.x.saturating_sub(1);
-        extended_by_one.y = extended_by_one.y.saturating_sub(1);
-        extended_by_one.width += 1;
-        extended_by_one.height += 1;
+        extended_by_one.width += 2;
 
         Clear.render(extended_by_one, buf);
         let search_block = Block::default()
@@ -190,36 +168,14 @@ impl StatefulWidget for TextInput {
 
         let text_area = Rect::new(area.x + 2, area.y + 1, area.width - 2, 1);
         let search_text =
-            Paragraph::new(Text::from(state.input.clone())).wrap(Wrap { trim: false });
+            Paragraph::new(Text::from(state.input.to_string().to_owned()).style(state.color))
+                .wrap(Wrap { trim: false });
 
         search_text.render(text_area, buf);
-        let cursor_position = (text_area.x + state.character_index, text_area.y);
+        let cursor_position = (
+            text_area.x + state.input.visual_cursor() as u16,
+            text_area.y,
+        );
         state.cursor_position = cursor_position;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_input_state() {
-        let mut state = TextInputState::default();
-        state.add_char('a');
-        state.add_char('b');
-        state.add_char('c');
-        assert_eq!(state.input, "abc");
-        assert_eq!(state.character_index, 3);
-        state.backspace();
-        assert_eq!(state.input, "ab");
-        state.add_char('d');
-        assert_eq!(state.input, "abd");
-        state.move_left();
-        assert_eq!(state.input, "abd");
-        assert_eq!(state.character_index, 2);
-        state.backspace();
-        assert_eq!(state.input, "ad");
-        state.add_char('e');
-        assert_eq!(state.input, "aed");
     }
 }
