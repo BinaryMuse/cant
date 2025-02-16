@@ -1,4 +1,4 @@
-use std::{error::Error, rc::Rc};
+use std::error::Error;
 
 use crossterm::event::{self, Event, KeyCode};
 use ratatui::{
